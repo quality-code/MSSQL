@@ -1,0 +1,1 @@
+insert into [ReportServer].[dbo].[Keys] ([MachineName],[InstallationID],[InstanceName],[Client],[PublicKey],[SymmetricKey])  values (NULL,'00000000-0000-0000-0000-000000000000',NULL,-1,NULL,NULL)

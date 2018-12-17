@@ -1,0 +1,22 @@
+--1. Ver ubicación actual
+SELECT name AS BD, type_desc [TIPO ARCHIVO], physical_name AS UBICACION, size AS TAMAÑO 
+FROM sys.database_files
+WHERE type_desc='<TIPO_ARCHIVO>' --MDF, NDF O LDF
+
+--2. Separar archivos
+EXEC sp_detach_db '<BASE_DE_DATOS>', 'true'
+
+--3. Mover el archivo ldf a la nueva ubicación
+Exec xp_cmdshell 'copy <RUTA_ORIGEN>\<NOMBRE_ARCHIVO> <RUTA_DESTINO>\<NOMBRE_ARCHIVO>', NO_OUTPUT
+
+--4. Unir nuevamente archivos
+CREATE DATABASE <BASE_DE_DATOS>   
+    ON (FILENAME = '<UBICACION_MDF>'),   
+	(FILENAME = '<UBICACION_NDF>'), --SI APLICA
+    (FILENAME = 'UBICACION_LDF')   
+    FOR ATTACH;
+
+--Ver nueva ubicación
+SELECT name AS BD, type_desc [TIPO ARCHIVO], physical_name AS UBICACION, size AS TAMAÑO 
+FROM sys.database_files
+WHERE type_desc='<TIPO_ARCHIVO>' --MDF, NDF O LDF

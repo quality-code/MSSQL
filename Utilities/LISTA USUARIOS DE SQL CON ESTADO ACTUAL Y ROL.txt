@@ -1,0 +1,16 @@
+SELECT a.name AS Nombre,a.type_desc AS Tipo,
+CASE WHEN a.is_disabled=1 THEN 'SI' ELSE 'NO' END as Deshabilitado,
+CASE
+    WHEN b.sysadmin = 1 THEN 'sysadmin'
+    WHEN b.securityadmin=1 THEN 'securityadmin'
+    WHEN b.serveradmin=1 THEN 'serveradmin'
+    WHEN b.setupadmin=1 THEN 'setupadmin'
+    WHEN b.processadmin=1 THEN 'processadmin'
+    WHEN b.diskadmin=1 THEN 'diskadmin'
+    WHEN b.dbcreator=1 THEN 'dbcreator'
+    WHEN b.bulkadmin=1 THEN 'bulkadmin'ELSE 'Public' END AS 'Rol en Servidor'
+	FROM sys.server_principals a  
+	JOIN MASTER..syslogins b
+    ON a.sid=b.sid WHERE a.TYPE  <> 'R'
+      AND a.name NOT LIKE '##%'
+GO

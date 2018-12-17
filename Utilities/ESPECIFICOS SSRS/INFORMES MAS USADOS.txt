@@ -1,0 +1,8 @@
+SELECT Top (10) Name INFORME, b.path RUTA,
+       COUNT(*) AS [NRO EJECUCIONES]
+FROM ReportServer.dbo.ExecutionLog EL 
+     JOIN ReportServer.dbo.CATALOG b 
+     ON EL.reportid = b.itemid 
+	 WHERE Name<>'' AND TimeEnd>=@FECHAI
+GROUP BY Name,b.path
+ORDER BY COUNT(*)DESC

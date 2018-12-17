@@ -1,0 +1,171 @@
+SELECT '*** comienzo de informe DAC ***'
+
+SELECT '-- Mostrar SQL Server Info'
+EXEC ('USE MASTER')
+
+SELECT
+CONVERT(char(20), SERVERPROPERTY('MachineName')) AS 'Nombre Maquina',
+CONVERT(char(20), SERVERPROPERTY('ServerName')) AS 'Nombre SQL Server',
+
+(CASE WHEN CONVERT(char(20), SERVERPROPERTY('InstanceName')) IS NULL
+THEN 'Instancia Predeterminada'
+ELSE CONVERT(char(20), SERVERPROPERTY('InstanceName'))
+END) AS 'Nombre de Instancia',
+
+CONVERT(char(20), SERVERPROPERTY('EDITION')) AS Edicion,
+CONVERT(char(20), SERVERPROPERTY('ProductVersion')) AS 'Version',
+CONVERT(char(20), SERVERPROPERTY('ProductLevel')) AS 'Level',
+
+(CASE WHEN CONVERT(char(20), SERVERPROPERTY('ISClustered')) = 1
+THEN 'Clustered'
+WHEN CONVERT(char(20), SERVERPROPERTY('ISClustered')) = 0
+THEN 'NOT Clustered'
+ELSE 'INVALID INPUT/ERROR'
+END) AS 'FAILOVER CLUSTERED',
+
+(CASE WHEN CONVERT(char(20), SERVERPROPERTY('ISIntegratedSecurityOnly')) = 1
+THEN 'Seguridad Integrada '
+WHEN CONVERT(char(20), SERVERPROPERTY('ISIntegratedSecurityOnly')) = 0
+THEN 'Seguridad SQL Server '
+ELSE 'INVALID INPUT/ERROR'
+END) AS 'SECURITY',
+
+(CASE WHEN CONVERT(char(20), SERVERPROPERTY('ISSingleUser')) = 1
+THEN 'Single User'
+WHEN CONVERT(char(20), SERVERPROPERTY('ISSingleUser')) = 0
+THEN 'Multi User'
+ELSE 'INVALID INPUT/ERROR'
+END) AS 'USER MODE',
+
+CONVERT(char(30), SERVERPROPERTY('COLLATION')) AS COLLATION
+
+SELECT '-- Mostrar las 5 sentencias mas consumidoras'
+SELECT TOP 5 total_worker_time/execution_count AS [Avg CPU Time],
+SUBSTRING(st.text, (qs.statement_start_offset/2)+1,
+((CASE qs.statement_end_offset
+WHEN -1 THEN DATALENGTH(st.text)
+ELSE qs.statement_end_offset
+END - qs.statement_start_offset)/2) + 1) AS statement_text
+FROM sys.dm_exec_query_stats AS qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS st
+ORDER BY total_worker_time/execution_count DESC;
+
+SELECT '-- Mostrar quienes están logeados'
+SELECT login_name ,COUNT(session_id) AS session_count
+FROM sys.dm_exec_sessions
+GROUP BY login_name;
+
+SELECT '-- Mostrar cursores con tiempos extensos de ejecución'
+EXEC ('USE master')
+
+SELECT creation_time ,cursor_id
+,name ,c.session_id ,login_name
+FROM sys.dm_exec_cursors(0) AS c
+JOIN sys.dm_exec_sessions AS s
+ON c.session_id = s.session_id
+WHERE DATEDIFF(mi, c.creation_time, GETDATE()) > 5;
+
+SELECT '-- Mostrar sesiones con transacciones abiertas'
+SELECT s.*
+FROM sys.dm_exec_sessions AS s
+WHERE EXISTS
+(
+SELECT *
+FROM sys.dm_tran_session_transactions AS t
+WHERE t.session_id = s.session_id
+)
+AND NOT EXISTS
+(
+SELECT *
+FROM sys.dm_exec_requests AS r
+WHERE r.session_id = s.session_id
+);
+
+SELECT '-- Mostrar espacio libre en tempdb '
+SELECT SUM(unallocated_extent_page_count) AS [free pages],
+(SUM(unallocated_extent_page_count)*1.0/128) AS [free space in MB]
+FROM sys.dm_db_file_space_usage;
+
+SELECT '-- Mostrar espacio ocupado por tempdb'
+SELECT SUM(size)*1.0/128 AS [size in MB]
+FROM tempdb.sys.database_files
+
+SELECT '-- Mostrar jobs activos'
+SELECT DB_NAME(database_id) AS [Database], COUNT(*) AS [Active Async Jobs]
+FROM sys.dm_exec_background_job_queue
+WHERE in_progress = 1
+GROUP BY database_id;
+
+SELECT '--Mostrar clientes conectados'
+SELECT session_id, client_net_address, client_tcp_port
+FROM sys.dm_exec_connections;
+
+SELECT '--Mostrar batchs en ejecución'
+SELECT * FROM sys.dm_exec_requests;
+
+SELECT '--Mostrar request actualmente bloqueados'
+SELECT session_id ,status ,blocking_session_id
+,wait_type ,wait_time ,wait_resource
+,transaction_id
+FROM sys.dm_exec_requests
+WHERE status = N'suspended'
+
+SELECT '--Mostrar fechas de ultimos backups ' as ' '
+SELECT B.name as Database_Name,
+ISNULL(STR(ABS(DATEDIFF(day, GetDate(),
+MAX(Backup_finish_date)))), 'NEVER')
+as DaysSinceLastBackup,
+ISNULL(Convert(char(10),
+MAX(backup_finish_date), 101), 'NEVER')
+as LastBackupDate
+
+FROM master.dbo.sysdatabases B LEFT OUTER JOIN msdb.dbo.backupset A
+ON A.database_name = B.name AND A.type = 'D' GROUP BY B.Name ORDER BY B.name
+
+SELECT '--Mostrar jobs que están todavía en ejecución' as ' '
+exec msdb.dbo.sp_get_composite_job_info NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL
+
+SELECT '--Mostrar informe de Jobs fallidos ' as ' '
+SELECT name FROM msdb.dbo.sysjobs A, msdb.dbo.sysjobservers B WHERE A.job_id = B.job_id AND B.last_run_outcome = 0
+
+SELECT '--Mostrar jobs deshabilitados ' as ' '
+SELECT name FROM msdb.dbo.sysjobs WHERE enabled = 0 ORDER BY name
+
+SELECT '--Mostrar espacio disponible de BD ' as ' '
+exec sp_MSForEachDB 'Use ? SELECT name AS ''Name of File'', size/128.0 -CAST(FILEPROPERTY(name, ''SpaceUsed'' )
+AS int)/128.0 AS ''Espacio disponible en MB'' FROM .SYSFILES'
+
+SELECT '--Mostrar total DB size (.MDF+.LDF)' as ' '
+set nocount on
+declare @name sysname
+declare @SQL nvarchar(600)
+-- Use temporary table to sum up database size w/o using group by
+create table #databases (
+DATABASE_NAME sysname NOT NULL,
+size int NOT NULL)
+declare c1 cursor for
+select name from master.dbo.sysdatabases
+-- where has_dbaccess(name) = 1 -- Only look at databases to which we have access
+open c1
+fetch c1 into @name
+
+while @@fetch_status >= 0
+begin
+select @SQL = 'insert into #databases
+select N'''+ @name + ''', sum(size) from '
++ QuoteName(@name) + '.dbo.sysfiles'
+-- Insert row for each database
+execute (@SQL)
+fetch c1 into @name
+end
+deallocate c1
+
+select DATABASE_NAME, DATABASE_SIZE_MB = size*8/1000 -- Convert from 8192 byte pages to K and then convert to MB
+from #databases order by 1
+
+select SUM(size*8/1000)as '--Shows disk space used - ALL DBs - MB ' from #databases
+
+drop table #databases
+
+SELECT '--Mostrar espacio disponible en disco ' as ' '
+EXEC master..xp_fixeddrives

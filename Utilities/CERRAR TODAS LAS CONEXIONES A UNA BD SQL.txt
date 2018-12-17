@@ -1,0 +1,26 @@
+APLICA CUANDO SE DESEA PASAR LA BD A UN ESTADO SINGLE_USER, VER SUS PROPIEDADES, QUITAR UN ESTADO RECOVERY PENDING ETC. Y EL SCRIPT NO CORRE PORQUE HAY OTRAS SESIONES ABIERTAS; ESTE SCRIPT CIERRA TODAS LAS CONEXIONES
+
+**************************SCRIPT**************************************************
+
+USE master
+GO
+SET NOCOUNT ON
+DECLARE @DBName varchar(50)
+DECLARE @spidstr varchar(8000)
+DECLARE @ConnKilled smallint
+SET @ConnKilled=0
+SET @spidstr = ''
+Set @DBName = 'NombreDeLaBaseDeDatos'
+IF db_id(@DBName) < 4
+BEGIN
+PRINT 'Connections to system databases cannot be killed'
+RETURN
+END
+SELECT @spidstr=coalesce(@spidstr,',' )+'kill '+convert(varchar, spid)+ '; '
+FROM master..sysprocesses WHERE dbid=db_id(@DBName)
+IF LEN(@spidstr) > 0
+BEGIN
+EXEC(@spidstr)
+SELECT @ConnKilled = COUNT(1)
+FROM master..sysprocesses WHERE dbid=db_id(@DBName)
+END

@@ -1,0 +1,16 @@
+Select
+database_name [Base de Datos],server_Name Servidor,Machine_Name Equipo,b.[name]as [Nombre Backup],
+CONVERT(VARCHAR(25),Backup_Start_Date,120) [Fecha Inicio],
+CONVERT(VARCHAR(25),Backup_Finish_Date,120) [Fecha final]
+,Physical_Device_Name Ubicacion
+from master.sys.databases a
+Inner Join msdb..backupset
+b on
+a.Name = b.Database_Name
+Inner Join msdb..backupmediafamily
+c on c.media_set_id
+= b.media_set_id
+WHERE database_name LIKE @BD + '%' AND
+CONVERT(VARCHAR(25),Backup_Finish_Date,120)>=@FECHAI + ' 00:00:00' AND
+CONVERT(VARCHAR(25),Backup_Finish_Date,120)<=@FECHAF + ' 23:59:00'
+ORDER BY database_name

@@ -1,0 +1,13 @@
+SELECT 
+	trigger_name = name, 
+	trigger_owner = USER_NAME(uid),
+	data_base = db_name(),
+	table_name = OBJECT_NAME(parent_obj), 
+	isupdate = OBJECTPROPERTY( id, 'ExecIsUpdateTrigger'), 
+	isdelete = OBJECTPROPERTY( id, 'ExecIsDeleteTrigger'), 
+	isinsert = OBJECTPROPERTY( id, 'ExecIsInsertTrigger'), 
+	isafter = OBJECTPROPERTY( id, 'ExecIsAfterTrigger'), 
+	isinsteadof = OBJECTPROPERTY( id, 'ExecIsInsteadOfTrigger'), 
+	status = CASE OBJECTPROPERTY(id, 'ExecIsTriggerDisabled') WHEN 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM dbo.sysobjects
+WHERE type = 'TR'

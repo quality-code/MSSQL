@@ -1,0 +1,7 @@
+--Reducir el tamaño de archivos de BD
+--ejemplo: Reducir el tamaño del LOG (.ldf) de la base datos tempdb
+ALTER DATABASE tempdb MODIFY FILE(NAME='templog',SIZE=10)
+
+--REDUCIR TAMAÑO BD
+--ejemplo: reducir al 50% el archivo 
+DBCC SHRINKDATABASE (tempdb,50)
